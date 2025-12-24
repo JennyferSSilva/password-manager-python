@@ -65,14 +65,7 @@ def setup_master(root):
     messagebox.showinfo("OK", "Senha master criada!", parent=root)
 
 def check_master(root):
-    pwd = simpledialog.askstring(
-        "Senha master",
-        "Digite a senha master:",
-        show="*",
-        parent=root
-    )
-    if not pwd:
-        sys.exit()
+    tentativas = 3
 
     with open(MASTER_FILE, "rb") as f:
         data = f.read()
@@ -80,12 +73,34 @@ def check_master(root):
     salt = data[:16]
     stored_hash = data[16:].decode()
 
-    if hash_master(pwd, salt) != stored_hash:
-        messagebox.showerror("Erro", "Senha master incorreta!", parent=root)
-        sys.exit()
+    while tentativas > 0:
+        pwd = simpledialog.askstring(
+            "Senha master",
+            f"Digite a senha master\nTentativas restantes: {tentativas}",
+            show="*",
+            parent=root
+        )
 
-    key = derive_key(pwd, salt)
-    return Fernet(key)
+        if not pwd:
+            sys.exit()
+
+        if hash_master(pwd, salt) == stored_hash:
+            key = derive_key(pwd, salt)
+            return Fernet(key)
+
+        tentativas -= 1
+        messagebox.showerror(
+            "Erro",
+            "Senha master incorreta!",
+            parent=root
+        )
+
+    messagebox.showerror(
+        "Bloqueado",
+        "Número máximo de tentativas atingido.\nO programa será encerrado.",
+        parent=root
+    )
+    sys.exit()
 
 # ================= FUNÇÕES =================
 def salvar_senha(root, cipher):
