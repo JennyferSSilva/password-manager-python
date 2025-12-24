@@ -1,40 +1,43 @@
-# 🔐 Gerenciador de Senhas em Python
+# 🔐 Gerenciador de Senhas Seguro em Python
 
-Um gerenciador de senhas simples e seguro desenvolvido em **Python**, utilizando **Tkinter** para interface gráfica, **SQLite** para armazenamento local e **criptografia forte** com **PBKDF2 + Fernet**.
-
-Este projeto tem fins **educacionais** e demonstra boas práticas de segurança no armazenamento de senhas.
+Um gerenciador de senhas local com **criptografia avançada**, interface gráfica em Tkinter e armazenamento protegido em SQLite.  
+Agora utilizando **PBKDF2 + Fernet**, limite de tentativas da senha master e busca otimizada por serviços.
 
 ---
 
 ## 🚀 Funcionalidades
 
-- 🔑 Senha master para acesso ao sistema
-- 🔐 Criptografia segura das senhas salvas
-- 💾 Armazenamento local com SQLite
-- 🔎 Busca de senhas por serviço
-- 🖥 Interface gráfica simples (Tkinter)
-- ❌ Proteção contra vazamento de dados sensíveis
+| Função | Descrição |
+|--------|------------|
+| Senha Master | Protege o acesso ao sistema |
+| PBKDF2 + Salt | Derivação da chave criptográfica com 390.000 iterações |
+| Criptografia Fernet | AES + HMAC para proteger as senhas armazenadas |
+| Armazenamento Local | Senhas dentro de um banco SQLite local |
+| Busca por Serviço | Pesquisa senhas digitando o nome do serviço |
+| Listagem com Opção Ocultar | Exibe senhas criptografadas ou descriptografadas conforme escolha |
+| 3 Tentativas de Login | Bloqueia o acesso após erros consecutivos |
 
 ---
 
-## 🛡️ Segurança
+## 🛡️ Segurança Utilizada
 
-O sistema utiliza:
+### 🔑 Autenticação
+- Senha master protegida com **SHA-256 + SALT**
+- Arquivo de autenticação: `master.dat`
 
-- **PBKDF2 (Password-Based Key Derivation Function 2)**  
-  → Deriva uma chave forte a partir da senha master
+### 🔐 Criptografia dos dados
+- Derivação de chave usando:
+```python
+PBKDF2HMAC(SHA256, 32 bytes, 390.000 iterações)
 
-- **Fernet (AES + HMAC)**  
-  → Criptografa e descriptografa as senhas armazenadas
-
-Arquivos sensíveis **não são versionados no GitHub**:
-- `passwords.db`
-- `master.dat`
-- `secret.key`
-
-Esses arquivos são ignorados via `.gitignore`.
 
 ---
 
-## 📂 Estrutura do Projeto
+# 📌 COMO ATUALIZAR NO GITHUB (depois do novo README)
 
+No PowerShell:
+
+```powershell
+git add README.md
+git commit -m "Atualização do README com novas funcionalidades"
+git push
