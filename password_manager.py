@@ -30,7 +30,7 @@ def derive_key(password: str, salt: bytes) -> bytes:
 def hash_master(password: str, salt: bytes) -> str:
     return hashlib.sha256(salt + password.encode()).hexdigest()
 
-# ================= DATABASE =================
+# ================= DB =================
 def init_db():
     with sqlite3.connect(DB_NAME) as conn:
         conn.execute("""
@@ -42,7 +42,7 @@ def init_db():
             )
         """)
 
-# ================= MASTER PASSWORD =================
+# ================= MASTER =================
 def setup_master(root):
     if os.path.exists(MASTER_FILE):
         return
@@ -104,7 +104,32 @@ def salvar_senha(root, cipher):
             (service, user, encrypted)
         )
 
-    messagebox.showinfo("OK", "Senha salva com sucesso!", parent=root)
+    messagebox.showinfo("OK", "Senha salva!", parent=root)
+
+def mostrar_resultados(root, rows, cipher):
+    exibir = messagebox.askyesno(
+        "Exibir senhas",
+        "Deseja exibir as senhas em texto?",
+        parent=root
+    )
+
+    texto = ""
+    for service, user, pwd in rows:
+        if exibir:
+            try:
+                senha = cipher.decrypt(pwd).decode()
+            except:
+                senha = "[Erro]"
+        else:
+            senha = "******"
+
+        texto += (
+            f"Serviço: {service}\n"
+            f"Usuário: {user}\n"
+            f"Senha: {senha}\n\n"
+        )
+
+    messagebox.showinfo("Resultado", texto, parent=root)
 
 def listar_senhas(root, cipher):
     with sqlite3.connect(DB_NAME) as conn:
@@ -116,20 +141,11 @@ def listar_senhas(root, cipher):
         messagebox.showinfo("Lista", "Nenhuma senha salva.", parent=root)
         return
 
-    texto = ""
-    for service, user, pwd in rows:
-        decrypted = cipher.decrypt(pwd).decode()
-        texto += (
-            f"Serviço: {service}\n"
-            f"Usuário: {user}\n"
-            f"Senha: {decrypted}\n\n"
-        )
-
-    messagebox.showinfo("Senhas", texto, parent=root)
+    mostrar_resultados(root, rows, cipher)
 
 def buscar_servico(root, cipher):
     termo = simpledialog.askstring(
-        "Buscar serviço",
+        "Buscar Serviço",
         "Digite o nome do serviço:",
         parent=root
     )
@@ -139,32 +155,15 @@ def buscar_servico(root, cipher):
 
     with sqlite3.connect(DB_NAME) as conn:
         rows = conn.execute(
-            """
-            SELECT service, username, password
-            FROM users
-            WHERE service LIKE ?
-            """,
+            "SELECT service, username, password FROM users WHERE service LIKE ?",
             (f"%{termo}%",)
         ).fetchall()
 
     if not rows:
-        messagebox.showinfo(
-            "Resultado",
-            "Nenhum serviço encontrado.",
-            parent=root
-        )
+        messagebox.showinfo("Resultado", "Nenhum serviço encontrado.", parent=root)
         return
 
-    texto = ""
-    for service, user, pwd in rows:
-        decrypted = cipher.decrypt(pwd).decode()
-        texto += (
-            f"Serviço: {service}\n"
-            f"Usuário: {user}\n"
-            f"Senha: {decrypted}\n\n"
-        )
-
-    messagebox.showinfo("Resultados", texto, parent=root)
+    mostrar_resultados(root, rows, cipher)
 
 # ================= MAIN =================
 def main():
@@ -181,26 +180,22 @@ def main():
     root.resizable(False, False)
 
     tk.Button(
-        root, text="Salvar Senha",
-        width=25,
+        root, text="Salvar Senha", width=25,
         command=lambda: salvar_senha(root, cipher)
     ).pack(pady=8)
 
     tk.Button(
-        root, text="Buscar por Serviço",
-        width=25,
+        root, text="Buscar por Serviço", width=25,
         command=lambda: buscar_servico(root, cipher)
     ).pack(pady=8)
 
     tk.Button(
-        root, text="Listar Senhas",
-        width=25,
+        root, text="Listar Senhas", width=25,
         command=lambda: listar_senhas(root, cipher)
     ).pack(pady=8)
 
     tk.Button(
-        root, text="Sair",
-        width=25,
+        root, text="Sair", width=25,
         command=root.destroy
     ).pack(pady=8)
 
