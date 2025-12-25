@@ -1,3 +1,4 @@
+from logging import root
 import sqlite3
 import tkinter as tk
 from tkinter import messagebox, simpledialog
@@ -180,6 +181,96 @@ def buscar_servico(root, cipher):
 
     mostrar_resultados(root, rows, cipher)
 
+def deletar_senha(root):
+    service = simpledialog.askstring(
+        "Deletar Senha",
+        "Informe o serviço que deseja deletar:",
+        parent=root
+    )
+
+    if not service:
+        return
+
+    with sqlite3.connect(DB_NAME) as conn:
+        cur = conn.execute(
+            "SELECT id, service, username FROM users WHERE service LIKE ?",
+            (f"%{service}%",)
+        )
+        rows = cur.fetchall()
+
+        if not rows:
+            messagebox.showinfo("Resultado", "Nenhum serviço encontrado.", parent=root)
+            return
+
+        # Se encontrar apenas 1, deleta direto
+        if len(rows) == 1:
+            conn.execute("DELETE FROM users WHERE id = ?", (rows[0][0],))
+            messagebox.showinfo("OK", "Senha deletada com sucesso!", parent=root)
+            return
+
+        # Se encontrar várias, pedir qual excluir
+        opcoes = "\n".join([f"{i+1}. {r[1]} - {r[2]}" for i, r in enumerate(rows)])
+        escolha = simpledialog.askinteger(
+            "Várias Encontradas",
+            f"Escolha qual apagar:\n\n{opcoes}",
+            parent=root
+        )
+
+        if escolha and 1 <= escolha <= len(rows):
+            conn.execute("DELETE FROM users WHERE id = ?", (rows[escolha-1][0],))
+            messagebox.showinfo("OK", "Senha deletada!", parent=root)
+
+def alterar_senha(root, cipher):
+    service = simpledialog.askstring(
+        "Alterar Senha",
+        "Informe o serviço que deseja alterar:",
+        parent=root
+    )
+    if not service:
+        return
+    
+    with sqlite3.connect(DB_NAME) as conn:
+        rows = conn.execute(
+            "SELECT id, service, username FROM users WHERE service LIKE ?",
+            (f"%{service}%",)
+        ).fetchall()
+
+    if not rows:
+        messagebox.showinfo("Resultado", "Nenhum serviço encontrado.", parent=root)
+        return
+
+    if len(rows) == 1:
+        alvo = rows[0]
+    else:
+        opcoes = "\n".join([f"{i+1}. {r[1]} - {r[2]}" for i, r in enumerate(rows)])
+        escolha = simpledialog.askinteger(
+            "Várias Encontradas",
+            f"Escolha qual editar:\n\n{opcoes}",
+            parent=root
+        )
+        if not escolha or escolha < 1 or escolha > len(rows):
+            return
+        alvo = rows[escolha-1]
+
+    nova_senha = simpledialog.askstring(
+        "Nova Senha",
+        "Digite a nova senha:",
+        show="*",
+        parent=root
+    )
+    if not nova_senha:
+        return
+
+    nova_senha_encriptada = cipher.encrypt(nova_senha.encode())
+
+    with sqlite3.connect(DB_NAME) as conn:
+        conn.execute(
+            "UPDATE users SET password = ? WHERE id = ?",
+            (nova_senha_encriptada, alvo[0])
+        )
+
+    messagebox.showinfo("OK", "Senha alterada com sucesso!", parent=root)
+
 # ================= MAIN =================
 def main():
     root = tk.Tk()
@@ -207,6 +298,16 @@ def main():
     tk.Button(
         root, text="Listar Senhas", width=25,
         command=lambda: listar_senhas(root, cipher)
+    ).pack(pady=8)
+
+    tk.Button(
+        root, text="Alterar Senha", width=25,
+        command=lambda: alterar_senha(root, cipher)
+    ).pack(pady=8)
+
+    tk.Button(
+        root, text="Deletar Senha", width=25,
+        command=lambda: deletar_senha(root)
     ).pack(pady=8)
 
     tk.Button(
