@@ -1,7 +1,11 @@
 # 🔐 Gerenciador de Senhas Seguro em Python
 
-Um gerenciador de senhas local com **criptografia avançada**, interface gráfica em Tkinter e armazenamento protegido em SQLite.  
-Agora utilizando **PBKDF2 + Fernet**, limite de tentativas da senha master e busca otimizada por serviços.
+Um gerenciador de senhas moderno e seguro, criado em Python utilizando:
+- `CustomTkinter` para interface profissional
+- `SQLite` para armazenamento local
+- `PBKDF2 + SHA256` para derivação de chave
+- `Fernet (AES)` para criptografia das senhas
+- Tela de Master Password com tentativas limitadas e verificação
 
 ---
 
@@ -38,6 +42,13 @@ Agora utilizando **PBKDF2 + Fernet**, limite de tentativas da senha master e bus
 
 ---
 
+##📜 Licença
+
+Este é um projeto livre para estudo e uso pessoal.
+🚫 Não é permitido uso comercial sem autorização.
+
+---
+
 ## 🛡️ Segurança Utilizada
 
 ### 🔑 Autenticação
@@ -48,3 +59,4 @@ Agora utilizando **PBKDF2 + Fernet**, limite de tentativas da senha master e bus
 - Derivação de chave usando:
 ```python
 PBKDF2HMAC(SHA256, 32 bytes, 390.000 iterações)
+
