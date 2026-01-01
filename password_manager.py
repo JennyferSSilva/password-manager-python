@@ -6,7 +6,9 @@ import hashlib
 import os
 import sys
 import base64
+import customtkinter as ctk
 
+from PIL import Image
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
@@ -103,219 +105,301 @@ def check_master(root):
     )
     sys.exit()
 
-# ================= FUNÇÕES =================
-def salvar_senha(root, cipher):
-    service = simpledialog.askstring("Serviço", "Nome do serviço:", parent=root)
-    user = simpledialog.askstring("Usuário", "Nome do usuário:", parent=root)
-    pwd = simpledialog.askstring("Senha", "Senha:", show="*", parent=root)
+# ================= TELAS INTERNAS E FUNÇÕES =================
 
-    if not service or not user or not pwd:
-        return
+def clear_content(content):
+    """Limpa a área principal antes de carregar outra tela"""
+    for widget in content.winfo_children():
+        widget.destroy()
 
-    encrypted = cipher.encrypt(pwd.encode())
 
-    with sqlite3.connect(DB_NAME) as conn:
-        conn.execute(
-            "INSERT INTO users (service, username, password) VALUES (?, ?, ?)",
-            (service, user, encrypted)
-        )
+def salvar_senha_tela(root, cipher, content):
+    clear_content(content)
 
-    messagebox.showinfo("OK", "Senha salva!", parent=root)
+    frame = ctk.CTkFrame(content, corner_radius=20, fg_color="#1e1e1e")
+    frame.pack(expand=True, fill="both", padx=60, pady=40)
 
-def mostrar_resultados(root, rows, cipher):
-    exibir = messagebox.askyesno(
-        "Exibir senhas",
-        "Deseja exibir as senhas em texto?",
-        parent=root
-    )
+    ctk.CTkLabel(frame, text="➕ Salvar Nova Senha", font=("Arial", 20, "bold")).pack(pady=15)
 
-    texto = ""
-    for service, user, pwd in rows:
-        if exibir:
-            try:
-                senha = cipher.decrypt(pwd).decode()
-            except:
-                senha = "[Erro]"
-        else:
-            senha = "******"
+    e_serv = ctk.CTkEntry(frame, placeholder_text="Serviço", width=300)
+    e_user = ctk.CTkEntry(frame, placeholder_text="Usuário", width=300)
+    e_pwd = ctk.CTkEntry(frame, placeholder_text="Senha", show="*", width=300)
 
-        texto += (
-            f"Serviço: {service}\n"
-            f"Usuário: {user}\n"
-            f"Senha: {senha}\n\n"
-        )
+    e_serv.pack(pady=8)
+    e_user.pack(pady=8)
+    e_pwd.pack(pady=8)
 
-    messagebox.showinfo("Resultado", texto, parent=root)
+    def salvar():
+        service, user, pwd = e_serv.get(), e_user.get(), e_pwd.get()
+        if not service or not user or not pwd:
+            return messagebox.showerror("Erro", "Preencha todos os campos!", parent=root)
 
-def listar_senhas(root, cipher):
-    with sqlite3.connect(DB_NAME) as conn:
-        rows = conn.execute(
-            "SELECT service, username, password FROM users"
-        ).fetchall()
+        encrypted = cipher.encrypt(pwd.encode())
+        with sqlite3.connect(DB_NAME) as conn:
+            conn.execute("INSERT INTO users (service, username, password) VALUES (?, ?, ?)",
+                         (service, user, encrypted))
+        messagebox.showinfo("OK", "Senha salva com sucesso!", parent=root)
 
-    if not rows:
-        messagebox.showinfo("Lista", "Nenhuma senha salva.", parent=root)
-        return
+    ctk.CTkButton(frame, text="💾 Salvar", width=200, corner_radius=15, command=salvar).pack(pady=20)
 
-    mostrar_resultados(root, rows, cipher)
 
-def buscar_servico(root, cipher):
-    termo = simpledialog.askstring(
-        "Buscar Serviço",
-        "Digite o nome do serviço:",
-        parent=root
-    )
+def buscar_servico_tela(root, cipher, content):
+    clear_content(content)
 
-    if not termo:
-        return
+    frame = ctk.CTkFrame(content, corner_radius=20, fg_color="#1e1e1e")
+    frame.pack(expand=True, fill="both", padx=60, pady=40)
 
-    with sqlite3.connect(DB_NAME) as conn:
-        rows = conn.execute(
-            "SELECT service, username, password FROM users WHERE service LIKE ?",
-            (f"%{termo}%",)
-        ).fetchall()
+    ctk.CTkLabel(frame, text="🔍 Buscar Serviço", font=("Arial", 20, "bold")).pack(pady=15)
 
-    if not rows:
-        messagebox.showinfo("Resultado", "Nenhum serviço encontrado.", parent=root)
-        return
+    e_busca = ctk.CTkEntry(frame, placeholder_text="Nome do serviço", width=300)
+    e_busca.pack(pady=10)
 
-    mostrar_resultados(root, rows, cipher)
+    box = tk.Text(frame, width=70, height=10, bd=0, relief="flat")
+    box.pack(pady=15)
 
-def deletar_senha(root):
-    service = simpledialog.askstring(
-        "Deletar Senha",
-        "Informe o serviço que deseja deletar:",
-        parent=root
-    )
+    def buscar():
+        termo = e_busca.get()
+        with sqlite3.connect(DB_NAME) as conn:
+            rows = conn.execute("SELECT service, username, password FROM users WHERE service LIKE ?",
+                                (f"%{termo}%",)).fetchall()
 
-    if not service:
-        return
-
-    with sqlite3.connect(DB_NAME) as conn:
-        cur = conn.execute(
-            "SELECT id, service, username FROM users WHERE service LIKE ?",
-            (f"%{service}%",)
-        )
-        rows = cur.fetchall()
-
+        box.delete("1.0", tk.END)
         if not rows:
-            messagebox.showinfo("Resultado", "Nenhum serviço encontrado.", parent=root)
-            return
+            return box.insert(tk.END, "Nenhum serviço encontrado.")
 
-        # Se encontrar apenas 1, deleta direto
-        if len(rows) == 1:
-            conn.execute("DELETE FROM users WHERE id = ?", (rows[0][0],))
-            messagebox.showinfo("OK", "Senha deletada com sucesso!", parent=root)
-            return
+        for s, u, p in rows:
+            try: dec = cipher.decrypt(p).decode()
+            except: dec = "[ERRO]"
+            box.insert(tk.END, f"Serviço: {s} | Usuário: {u} | Senha: {dec}\n")
 
-        # Se encontrar várias, pedir qual excluir
-        opcoes = "\n".join([f"{i+1}. {r[1]} - {r[2]}" for i, r in enumerate(rows)])
-        escolha = simpledialog.askinteger(
-            "Várias Encontradas",
-            f"Escolha qual apagar:\n\n{opcoes}",
-            parent=root
-        )
+    ctk.CTkButton(frame, text="🔎 Buscar", width=200, corner_radius=15, command=buscar).pack(pady=10)
 
-        if escolha and 1 <= escolha <= len(rows):
-            conn.execute("DELETE FROM users WHERE id = ?", (rows[escolha-1][0],))
-            messagebox.showinfo("OK", "Senha deletada!", parent=root)
-
-def alterar_senha(root, cipher):
-    service = simpledialog.askstring(
-        "Alterar Senha",
-        "Informe o serviço que deseja alterar:",
-        parent=root
-    )
-    if not service:
-        return
-    
-    with sqlite3.connect(DB_NAME) as conn:
-        rows = conn.execute(
-            "SELECT id, service, username FROM users WHERE service LIKE ?",
-            (f"%{service}%",)
-        ).fetchall()
-
-    if not rows:
-        messagebox.showinfo("Resultado", "Nenhum serviço encontrado.", parent=root)
-        return
-
-    if len(rows) == 1:
-        alvo = rows[0]
-    else:
-        opcoes = "\n".join([f"{i+1}. {r[1]} - {r[2]}" for i, r in enumerate(rows)])
-        escolha = simpledialog.askinteger(
-            "Várias Encontradas",
-            f"Escolha qual editar:\n\n{opcoes}",
-            parent=root
-        )
-        if not escolha or escolha < 1 or escolha > len(rows):
-            return
-        alvo = rows[escolha-1]
-
-    nova_senha = simpledialog.askstring(
-        "Nova Senha",
-        "Digite a nova senha:",
+def listar_senhas_tela(root, cipher, content):
+    # 🔐 Pedir senha master novamente
+    pwd_confirm = simpledialog.askstring(
+        "Confirmação de Segurança",
+        "Digite novamente a senha master para visualizar as senhas:",
         show="*",
         parent=root
     )
-    if not nova_senha:
+
+    if not pwd_confirm:
+        messagebox.showwarning("Cancelado", "A ação foi cancelada.", parent=root)
         return
 
-    nova_senha_encriptada = cipher.encrypt(nova_senha.encode())
+    # ⚠️ Verifica senha
+    with open(MASTER_FILE, "rb") as f:
+        data = f.read()
+    salt = data[:16]
+    stored_hash = data[16:].decode()
+
+    # Se estiver incorreta -> bloqueia visualização
+    if hash_master(pwd_confirm, salt) != stored_hash:
+        messagebox.showerror("Acesso Negado", "Senha master incorreta! Não é possível exibir as senhas.", parent=root)
+        return
+
+    # ================= TELA APÓS CONFIRMAÇÃO =================
+    clear_content(content)
+
+    frame = ctk.CTkFrame(content, corner_radius=20, fg_color="#1e1e1e")
+    frame.pack(expand=True, fill="both", padx=60, pady=40)
+
+    ctk.CTkLabel(frame, text="📋 Todas as Senhas", font=("Arial", 20, "bold")).pack(pady=15)
+
+    box = tk.Text(frame, width=70, height=12, bd=0, relief="flat", bg="#121212", fg="white")
+    box.pack(pady=10)
 
     with sqlite3.connect(DB_NAME) as conn:
-        conn.execute(
-            "UPDATE users SET password = ? WHERE id = ?",
-            (nova_senha_encriptada, alvo[0])
-        )
+        rows = conn.execute("SELECT service, username, password FROM users").fetchall()
 
-    messagebox.showinfo("OK", "Senha alterada com sucesso!", parent=root)
+    if not rows:
+        box.insert(tk.END, "Nenhuma senha cadastrada.\n")
+        return
+
+    for service, username, encrypted_pwd in rows:
+        try:
+            decrypted = cipher.decrypt(encrypted_pwd).decode()
+        except:
+            decrypted = "[ERRO AO DECIFRAR]"
+
+        box.insert(tk.END, f"🔐 Serviço: {service}\n👤 Usuário: {username}\n🔑 Senha: {decrypted}\n")
+        box.insert(tk.END, "──────────────────────────────────────\n")
+
+
+def alterar_senha_tela(root, cipher, content):
+    clear_content(content)
+
+    frame = ctk.CTkFrame(content, corner_radius=20, fg_color="#1e1e1e")
+    frame.pack(expand=True, fill="both", padx=60, pady=40)
+
+    ctk.CTkLabel(frame, text="✏️ Alterar Senha", font=("Arial", 20, "bold")).pack(pady=15)
+
+    e_serv = ctk.CTkEntry(frame, placeholder_text="Serviço", width=300)
+    e_nova = ctk.CTkEntry(frame, placeholder_text="Nova Senha", show="*", width=300)
+
+    e_serv.pack(pady=10)
+    e_nova.pack(pady=10)
+
+
+def deletar_senha_tela(root, cipher, content):
+    clear_content(content)
+
+    ctk.CTkLabel(content, text="🗑️ Deletar Senha", font=("Arial", 20, "bold")).pack(pady=10)
+
+    entrada = ctk.CTkEntry(content, width=350, placeholder_text="Digite o serviço")
+    entrada.pack(pady=10)
+
+    def buscar_para_deletar():
+        termo = entrada.get().strip()
+
+        if not termo:
+            messagebox.showerror("Erro", "Digite o nome do serviço para buscar!", parent=root)
+            return
+
+        with sqlite3.connect(DB_NAME) as conn:
+            rows = conn.execute(
+                "SELECT id, service, username, password FROM users WHERE LOWER(service) LIKE LOWER(?)",
+                (f"%{termo}%",)
+            ).fetchall()
+
+        if not rows:
+            messagebox.showinfo("Aviso", "Nenhuma senha encontrada com esse nome.", parent=root)
+            return
+
+        # --- Popup com lista para escolher ---
+        popup = ctk.CTkToplevel(root)
+        popup.title("Confirmação - Escolha a senha para deletar")
+        popup.geometry("500x300")
+        popup.grab_set()  # trava a tela até escolher
+
+        ctk.CTkLabel(
+            popup,
+            text=f"Selecione a senha que deseja deletar:",
+            font=("Arial", 16, "bold")
+        ).pack(pady=10)
+
+        frame_lista = ctk.CTkFrame(popup)
+        frame_lista.pack(fill="both", expand=True, padx=10, pady=10)
+
+        for user_id, serv, user, pwd in rows:
+            try:
+                senha_dec = cipher.decrypt(pwd).decode()
+            except:
+                senha_dec = "[ERRO]"
+
+            item = ctk.CTkButton(
+                frame_lista,
+                text=f"{serv}  |  {user}  |  {senha_dec}",
+                fg_color="#b30000",
+                hover_color="#7a0000",
+                command=lambda i=user_id, s=serv: confirmar_exclusao(i, s, popup)
+            )
+            item.pack(pady=5, fill="x")
+        
+        ctk.CTkButton(popup, text="Cancelar", command=popup.destroy).pack(pady=10)
+
+    def confirmar_exclusao(user_id, nome_servico, janela):
+        resposta = messagebox.askyesno(
+            "Confirmar Exclusão",
+            f"Tem certeza que deseja deletar a senha do serviço:\n\n  {nome_servico}\n\nIsso NÃO poderá ser desfeito!"
+        )
+        if not resposta:
+            return
+
+        with sqlite3.connect(DB_NAME) as conn:
+            conn.execute("DELETE FROM users WHERE id=?", (user_id,))
+            conn.commit()
+
+        janela.destroy()
+        clear_content(content)
+        messagebox.showinfo("OK", "Senha deletada com sucesso!", parent=root)
+
+    ctk.CTkButton(content, text="Buscar", width=200, command=buscar_para_deletar).pack(pady=20)
+
+
 
 # ================= MAIN =================
+
 def main():
-    root = tk.Tk()
-    root.withdraw()
+    # ===== Aparência =====
+    ctk.set_appearance_mode("dark")
+    ctk.set_default_color_theme("dark-blue")
+
+    app = ctk.CTk()
+    app.title("Gerenciador de Senhas - Profissional")
+    app.geometry("950x540")
 
     init_db()
-    setup_master(root)
-    cipher = check_master(root)
+    setup_master(app)
+    cipher = check_master(app)
 
-    root.deiconify()
-    root.title("Gerenciador de Senhas Seguro")
-    root.geometry("300x260")
-    root.resizable(False, False)
+    # ===== Grid principal =====
+    app.grid_columnconfigure(1, weight=1)
+    app.grid_rowconfigure(0, weight=1)
 
-    tk.Button(
-        root, text="Salvar Senha", width=25,
-        command=lambda: salvar_senha(root, cipher)
-    ).pack(pady=8)
+    # ===== SIDEBAR ESTILIZADO =====
+    sidebar = ctk.CTkFrame(app, width=220, corner_radius=20)
+    sidebar.grid(row=0, column=0, sticky="nsw", padx=15, pady=15)
 
-    tk.Button(
-        root, text="Buscar por Serviço", width=25,
-        command=lambda: buscar_servico(root, cipher)
-    ).pack(pady=8)
+    ctk.CTkLabel(
+        sidebar, 
+        text="🔐 Password Manager", 
+        font=("Arial", 20, "bold")
+    ).pack(pady=(20,10))
 
-    tk.Button(
-        root, text="Listar Senhas", width=25,
-        command=lambda: listar_senhas(root, cipher)
-    ).pack(pady=8)
+    # Botões estilizados
+    button_style = {
+        "width": 180,
+        "height": 40,
+        "corner_radius": 12,
+        "font": ("Arial", 14)
+    }
 
-    tk.Button(
-        root, text="Alterar Senha", width=25,
-        command=lambda: alterar_senha(root, cipher)
-    ).pack(pady=8)
+    ctk.CTkButton(sidebar, text="➕ Salvar Senha",
+                  command=lambda: salvar_senha_tela(app, cipher, content),
+                  **button_style).pack(pady=8)
 
-    tk.Button(
-        root, text="Deletar Senha", width=25,
-        command=lambda: deletar_senha(root)
-    ).pack(pady=8)
+    ctk.CTkButton(sidebar, text="🔍 Buscar Serviço",
+                  command=lambda: buscar_servico_tela(app, cipher, content),
+                  **button_style).pack(pady=8)
 
-    tk.Button(
-        root, text="Sair", width=25,
-        command=root.destroy
-    ).pack(pady=8)
+    ctk.CTkButton(sidebar, text="📋 Listar Senhas",
+                  command=lambda: listar_senhas_tela(app, cipher, content),
+                  **button_style).pack(pady=8)
 
-    root.mainloop()
+    ctk.CTkButton(sidebar, text="✏️ Alterar Senha",
+                  command=lambda: alterar_senha_tela(app, cipher, content),
+                  **button_style).pack(pady=8)
+
+    ctk.CTkButton(sidebar, text="🗑️ Deletar Senha",
+                  command=lambda: deletar_senha_tela(app, cipher, content),
+                  **button_style).pack(pady=8)
+
+    # Botão Sair destacado
+    ctk.CTkButton(
+        sidebar,
+        text="🚪 Sair",
+        fg_color="#b30000",
+        hover_color="#7a0000",
+        **button_style,
+        command=app.destroy
+    ).pack(pady=(40,10))
+
+    # ===== ÁREA PRINCIPAL =====
+    global content
+    content = ctk.CTkFrame(app, corner_radius=20)
+    content.grid(row=0, column=1, sticky="nsew", padx=15, pady=15)
+
+    ctk.CTkLabel(
+        content,
+        text="Bem-vindo ao Gerenciador de Senhas 🔐\nEscolha uma opção no menu 👉",
+        font=("Arial", 22, "bold"),
+        justify="center"
+    ).pack(expand=True)
+
+    app.mainloop()
+
+
 
 if __name__ == "__main__":
     main()
