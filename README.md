@@ -42,7 +42,7 @@ Um gerenciador de senhas moderno e seguro, criado em Python utilizando:
 
 ---
 
-##📜 Licença
+## 📜 Licença
 
 Este é um projeto livre para estudo e uso pessoal.
 🚫 Não é permitido uso comercial sem autorização.
