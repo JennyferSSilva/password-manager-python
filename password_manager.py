@@ -232,13 +232,67 @@ def alterar_senha_tela(root, cipher, content):
     frame = ctk.CTkFrame(content, corner_radius=20, fg_color="#1e1e1e")
     frame.pack(expand=True, fill="both", padx=60, pady=40)
 
-    ctk.CTkLabel(frame, text="✏️ Alterar Senha", font=("Arial", 20, "bold")).pack(pady=15)
+    ctk.CTkLabel(frame, text="✏️ Alterar Senha", font=("Arial", 22, "bold")).pack(pady=10)
 
-    e_serv = ctk.CTkEntry(frame, placeholder_text="Serviço", width=300)
+    # Campos
+    e_serv = ctk.CTkEntry(frame, placeholder_text="Serviço (ex: Instagram)", width=300)
     e_nova = ctk.CTkEntry(frame, placeholder_text="Nova Senha", show="*", width=300)
-
     e_serv.pack(pady=10)
     e_nova.pack(pady=10)
+
+    # Função interna para alterar
+    def confirmar_alteracao():
+        service = e_serv.get().strip()
+        nova = e_nova.get().strip()
+
+        if not service or not nova:
+            messagebox.showwarning("Aviso", "Preencha todos os campos!", parent=root)
+            return
+
+        # Verifica se o serviço existe
+        with sqlite3.connect(DB_NAME) as conn:
+            rows = conn.execute(
+                "SELECT id, service, username FROM users WHERE service LIKE ?",
+                (f"%{service}%",)
+            ).fetchall()
+
+        if not rows:
+            messagebox.showinfo("Erro", "Nenhuma senha encontrada com esse serviço.", parent=root)
+            return
+
+        # Se tiver mais de uma, escolher qual alterar
+        if len(rows) > 1:
+            selecao = tk.simpledialog.askinteger(
+                "Várias encontradas",
+                "Foram encontradas várias entradas.\nDigite o ID da senha que deseja alterar:\n\n" +
+                "\n".join([f"ID {r[0]} - {r[1]} ({r[2]})" for r in rows]),
+                parent=root
+            )
+            if not selecao:
+                return
+            target_id = selecao
+        else:
+            target_id = rows[0][0]
+
+        # Atualiza no banco
+        encrypted = cipher.encrypt(nova.encode())
+        with sqlite3.connect(DB_NAME) as conn:
+            conn.execute("UPDATE users SET password=? WHERE id=?", (encrypted, target_id))
+
+        messagebox.showinfo("Sucesso", "Senha alterada com sucesso!", parent=root)
+        e_serv.delete(0, "end")
+        e_nova.delete(0, "end")
+
+    # Botão de confirmar
+    ctk.CTkButton(
+        frame,
+        text="Salvar Nova Senha",
+        fg_color="#0057b7",
+        hover_color="#003f8a",
+        command=confirmar_alteracao,
+        width=200
+    ).pack(pady=25)
+
 
 
 def deletar_senha_tela(root, cipher, content):
